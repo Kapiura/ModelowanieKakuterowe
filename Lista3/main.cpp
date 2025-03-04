@@ -1,20 +1,20 @@
 #include <iostream>
-#include <mutex>
+#include <array>
+#include <sstream>
 #include <thread>
 #include <cstdlib> 
 #include <vector>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-std::mutex mtx;
 
 void getTerminalSize(int& width, int& height)
 {
   struct winsize w;
   if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0)
   {
-    width = w.ws_col - 10;
-    height = w.ws_row - 10;
+    width = w.ws_col - 1;
+    height = w.ws_row - 1;
   }
   else
   {
@@ -34,30 +34,6 @@ namespace colors
   Color black = {0,0,0};
 }
 
-void printRow(const std::vector<bool>& row)
-{
-    for(bool&& el: row)
-    {
-      Color tmp = el ? colors::white : colors::black;
-      std::cout<<"\x1b[48;2;" << tmp.red << ";" << tmp.green << ";" << tmp.blue << "m \x1b[0m";
-    }
-    std::cout << "\n"; 
-}
-
-void printTable(std::vector<std::vector<bool>>& tab)
-{
-  std::vector<std::thread> threads;
-  for(const auto& row: tab)
-  {
-        threads.push_back(std::thread([&](){
-            std::lock_guard<std::mutex> lock(mtx);
-            printRow(row);
-        }));
-  }
-  for(auto& t: threads)
-    t.join();
-}
-
 void randomizeTab(std::vector<std::vector<bool>>& tab)
 {
   for(auto& row: tab)
@@ -69,12 +45,33 @@ void randomizeTab(std::vector<std::vector<bool>>& tab)
   }
 }
 
+const std::vector<std::pair<int, int>> neighborOffsets = 
+{
+    {-1, -1}, {-1, 0}, {-1, 1},
+    {0, -1},           {0, 1},
+    {1, -1},  {1, 0},  {1, 1}
+};
+
 int coutnNeighbourNum(const std::vector<std::vector<bool>>& tab, int x, int y)
 {
-  return 0;
+  int count{};
+  int numRow = tab.size();
+  int numCol = tab[0].size();
+
+  for(const auto& off: neighborOffsets)
+  {
+    int newX = x + off.first;
+    int newY = y + off.second;
+    if(newX >= 0 && newY >= 0 && newY && newX < numRow && newY < numCol)
+    {
+      if(tab[newX][newY])
+        count++;
+    }
+  }
+  return count;
 }
 
-std::vector<std::vector<bool>> checkLife(const std::vector<std::vector<bool>>& tab)
+void checkLife(std::vector<std::vector<bool>>& tab)
 {
   std::vector<std::vector<bool>> tmp = tab;
   for(int row = 0; row < tab.size(); row++)
@@ -90,13 +87,34 @@ std::vector<std::vector<bool>> checkLife(const std::vector<std::vector<bool>>& t
             tmp[row][col] = false;
       }
   }
-  return tmp;
+  tab = tmp;
+}
+
+
+std::string buildFrame(const std::vector<std::vector<bool>>& tab)
+{
+  std::ostringstream oss;
+  for(const auto& row: tab)
+  {
+    for(bool cell: row)
+    {
+      Color tmp = cell ? colors::white : colors::black;
+      oss <<"\x1b[48;2;" << tmp.red << ";" << tmp.green << ";" << tmp.blue << "m \x1b[0m";
+    }
+    oss << "\n";
+  }
+  return oss.str();
+}
+
+void printFrame(const std::string& frame)
+{
+  std::cout << "\033[H" << frame << std::flush; 
 }
 
 int main()
 {
-  std::system("clear");
-  
+  std::cout << "\033[2J";
+  std::cout << "\033[?25l";
   // tab size
   int width{};
   int height{};
@@ -105,16 +123,16 @@ int main()
   std::cout << "Terminal size: " << width << "x" << height << "\n";
   
   sleep(2);
-  std::vector<std::vector<bool>> tab(10, std::vector<bool>(10, false));
-  /* std::vector<std::vector<bool>> tab(width, std::vector<bool>(height, false)); */
+  std::vector<std::vector<bool>> tab(width, std::vector<bool>(height, false));
   randomizeTab(tab);
   std::system("clear");
   for(;;)
   {
-    printTable(tab);
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::string frame = buildFrame(tab);
+    printFrame(frame);
+    /* std::this_thread::sleep_for(std::chrono::milliseconds(100)); */
     checkLife(tab);
-    std::system("clear");
   }
+  std::cout << "\033[?25h";
   return 0;
 }
