@@ -1,11 +1,15 @@
 #include <array>
 #include <cstdlib>
+#include <algorithm>
 #include <iostream>
 #include <sstream>
 #include <sys/ioctl.h>
 #include <thread>
+#include "matplotlibcpp.h"
 #include <unistd.h>
 #include <vector>
+
+namespace plt = matplotlibcpp;
 
 // colors
 struct Color
@@ -64,6 +68,25 @@ struct LifeGame
             checkLife(tab);
         }
     }
+
+    std::vector<std::pair<int, int>> loopWithSave(int n) 
+    {
+        std::vector<std::pair<int, int>> tmp;
+        int allCells = tab[0].size() * tab.size();
+        for (int i = 0; i < n; i++) {
+          std::string frame = buildFrame(tab);
+          printFrame(frame);
+          checkLife(tab);
+          std::cout << "i = " << i << "\n";
+          int liveCells = 0;
+          for (auto &row : tab) {
+            liveCells +=
+                std::count_if(row.begin(), row.end(), [](bool val) { return val; });
+          }
+          tmp.push_back(std::make_pair(i, liveCells));
+        }
+        return tmp;
+      }
 
     void randomizeTab(std::vector<std::vector<bool>> &tab)
     {
@@ -137,7 +160,28 @@ struct LifeGame
 int main()
 {
     LifeGame life;
-    life.loop();
+    auto data = life.loopWithSave(20);
+
+    std::vector<int> x;
+    std::vector<double> y;
+    int allCells = 100 * 100;
+    
+    for (const auto &point : data) 
+    {
+        x.push_back(point.first);
+        y.push_back(point.second / static_cast<double>(allCells));
+    }
+
+    plt::plot(x, y);
+    plt::named_plot("Gęstość w czasie", x, y, "b-");
+    
+    plt::title("Wykres gęstości żywych komórek w czasie");
+    plt::xlabel("Czas [Iteracja]");
+    plt::ylabel("Gęstość żywych komórek [%]");
+    plt::legend();
+    plt::grid(true);
+    
+    plt::save("wykres.png");
     std::cout << "\033[?25h";
     return 0;
 }
