@@ -3,30 +3,36 @@
 #include <vector>
 #include <cmath>
 #include <fstream>
+#include <thread>
+#include <mutex>
 
-
-namespace plt = matplotlibcpp;
+std::mutex mtx;
 
 struct LifeGame {
     int width, height;
     std::vector<std::vector<bool>> tab;
     double p0;
-    
+
     LifeGame(int w, int h, double p) : width(w), height(h), p0(p) {
         tab.resize(width, std::vector<bool>(height, false));
         randomizeTab();
     }
 
     void randomizeTab() {
-        for (auto &row : tab)
-            for (auto cell : row)
-                cell = ((double)rand() / RAND_MAX) < p0;
+        for (int i = 0; i < width; i++) {
+            for (int j = 0; j < height; j++) {
+                tab[i][j] = ((double)rand() / RAND_MAX) < p0;
+            }
+        }
     }
 
     int countLiveCells() {
         int liveCells = 0;
-        for (auto &row : tab)
-            liveCells += std::count(row.begin(), row.end(), true);
+        for (const auto& row : tab) {
+            for (bool cell : row) {
+                if (cell) liveCells++;
+            }
+        }
         return liveCells;
     }
 
@@ -61,33 +67,43 @@ struct LifeGame {
     }
 };
 
+void runSimulation(int L, double p0, int iterations, std::vector<double>& densities, int i) {
+    LifeGame game(L, L, p0);
+    game.simulate(iterations);
+    double density = (double)game.countLiveCells() / (L * L);
+
+    std::lock_guard<std::mutex> lock(mtx);
+    densities.push_back(density);
+
+    std::cout << "i = " << i << "\r" << std::flush;
+}
+
 void calculateErrors(const std::vector<int>& Ls, int iterations, double p0, int N) {
-    std::vector<double> means, standardErrors;
     std::ofstream file("errors.txt");
-    
+
     for (int L : Ls) {
         std::vector<double> densities;
-        std::cout << "L: " << L << "\n";
-        
+        std::cout << "Processing L=" << L << "...\n";
+
+        std::vector<std::thread> threads;
+
         for (int i = 0; i < N; i++) {
-        std::cout << "i: " << i << "\n";
-            LifeGame game(L, L, p0);
-            game.simulate(iterations);
-            double density = (double)game.countLiveCells() / (L * L);
-            densities.push_back(density);
+            threads.push_back(std::thread(runSimulation, L, p0, iterations, std::ref(densities), i));
         }
-        
+
+        for (auto& t : threads) {
+            t.join();
+        }
+
         double sum = 0;
         for (double d : densities) sum += d;
         double mean = sum / N;
-        means.push_back(mean);
-        
+
         double variance = 0;
         for (double d : densities) variance += (d - mean) * (d - mean);
         variance /= (N - 1);
         double sem = sqrt(variance) / sqrt(N);
-        standardErrors.push_back(sem);
-        
+
         file << L << " " << sem << "\n";
         std::cout << "L=" << L << " SEM=" << sem << "\n";
     }
@@ -99,7 +115,7 @@ int main() {
     int iterations = 1000;
     double p0 = 0.5;
     int N = 100;
-    
+
     calculateErrors(Ls, iterations, p0, N);
     return 0;
 }
