@@ -87,34 +87,10 @@ void draw_with_gnuplot()
     pclose(gp);
 }
 
-void plot_scaling()
-{
-    FILE* gp = popen("gnuplot -persistent", "w");
-    if (!gp) {
-        std::cerr << "Nie udało się uruchomić gnuplota do rysowania skali\n";
-        return;
-    }
-
-    fprintf(gp,
-        "set terminal pngcairo size 800,600\n"
-        "set output 'eden_scaling.png'\n"
-        "set title 'Skalowanie promienia klastra'\n"
-        "set xlabel 'log(N)'\n"
-        "set ylabel 'log(R)'\n"
-        "set logscale xy\n"
-        "set grid\n"
-        "plot 'eden_skala.csv' every ::1 using (log($1)):(log($2)) with linespoints title 'Eden scaling'\n"
-    );
-    fflush(gp);
-    pclose(gp);
-}
-
-
 int main()
 {
     std::srand(std::time(nullptr));
 
-    // Nadpisujemy plik na nowo z nagłówkiem
     std::ofstream f("eden_skala.csv");
     f << "N,R\n";
     f.close();
@@ -131,21 +107,15 @@ int main()
 
         std::cout << "Steps: " << steps << " -> N = " << N << ", R = " << R << "\n";
 
-        // Dopisujemy do pliku skali
         std::ofstream f("eden_skala.csv", std::ios::app);
         f << N << "," << R << "\n";
         f.close();
 
-        // Dla ostatniej iteracji zapisz dane do pliku i narysuj klaster
         if (steps == 10000)
         {
             save_to_file(pos, "eden_data.dat");
             draw_with_gnuplot();
         }
     }
-
-    // Rysujemy wykres skalowania
-    plot_scaling();
-
     return 0;
 }
