@@ -14,7 +14,7 @@ std::vector<std::pair<int, int>> directions = {
     {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, -1}, {1, 0}
 };
 
-enum RuleType { RULE_1, RULE_2, RULE_3, RULE_ALWAYS };
+enum RuleType { RULE_1, RULE_2, RULE_3, RULE_ALWAYS, RULE_COMPLEX };
 
 bool rule(int count, RuleType ruleType)
 {
@@ -26,6 +26,8 @@ bool rule(int count, RuleType ruleType)
             return count == 2;
         case RULE_3:
             return count >= 1;
+        case RULE_COMPLEX:
+            return count == 2 || count == 3;
     }
     return false;
 }
@@ -113,7 +115,8 @@ int main()
     std::vector<std::pair<RuleType, std::string>> rules = {
         {RULE_1, "platek_1_sasiad"},
         {RULE_2, "platek_2_sasiadow"},
-        {RULE_3, "platek_min1_sasiad"}
+        {RULE_3, "platek_min1_sasiad"},
+        {RULE_COMPLEX, "platek_zlozona_regula"}
     };
 
     for (const auto& [ruleType, name] : rules) {
